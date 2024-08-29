@@ -39,42 +39,22 @@ impl Node {
         // we connect a node
         // out going for us, in going for them
         if nodes[self_index.0][self_index.1].connected_nodes.is_none() {
-            nodes[self_index.0][self_index.1].connected_nodes = Some(vec![Connection::Out(nodes[other_index.0][other_index.1].position)]);
+            nodes[self_index.0][self_index.1].connected_nodes = Some(vec![Connection::In(nodes[other_index.0][other_index.1].position)]);
         } else {
             let position = (nodes[other_index.0][other_index.1].position).clone();
             if let Some(last_nodes) = &mut nodes[self_index.0][self_index.1].connected_nodes {
-                last_nodes.push(Connection::Out(position));
+                last_nodes.push(Connection::In(position));
             }
         }
         
         if nodes[other_index.0][other_index.1].connected_nodes.is_none() {
-            nodes[other_index.0][other_index.1].connected_nodes = Some(vec![Connection::In(nodes[self_index.0][self_index.1].position)]);
+            nodes[other_index.0][other_index.1].connected_nodes = Some(vec![Connection::Out(nodes[self_index.0][self_index.1].position)]);
         } else {
             let position = (nodes[self_index.0][self_index.1].position).clone();
             if let Some(last_nodes) = &mut nodes[other_index.0][other_index.1].connected_nodes {
-                last_nodes.push(Connection::In(position));
+                last_nodes.push(Connection::Out(position));
             }
         }
-        // if let Some((last_nodes)) = &nodes[self_index.0][self_index.1].connected_nodes {
-        //     if last_nodes.contains(&Connection::Out(nodes[other_index.0][other_index.1].position)) {
-        //         return;
-        //     }
-        //     if last_nodes.contains(&Connection::In(nodes[other_index.0][other_index.1].position)) {
-        //         return;
-        //     }   
-        // }
-        
-        // if let Some(last_nodes) = &nodes[other_index.0][other_index.1].connected_nodes {
-        //     if last_nodes.contains(&Connection::Out(nodes[self_index.0][self_index.1].position)) {
-        //         return;
-        //     }
-        //     if last_nodes.contains(&Connection::In(nodes[self_index.0][self_index.1].position)) {
-        //         return;
-        //     }
-        // }
-
-        
-
     }
 
     pub fn draw_connection(&self, draw: &Draw) {
