@@ -13,6 +13,7 @@ struct Model {
     nodes: Vec<Vec<Node>>,
     maze_size: usize,
     step_speed: f32,
+    stop: bool,
     walker: (Vec2, Vec2, usize),
     explored_nodes: Vec<Vec2>,
     traced_nodes: HashSet<usize>,
@@ -59,6 +60,7 @@ fn model(app: &App) -> Model {
         nodes,
         maze_size,
         step_speed: 60.0,
+        stop: false,
         walker: (vec2(0.0, 0.0), vec2(1.0, 0.0), 1),
         explored_nodes: vec![vec2(0.0, 0.0)],
         traced_nodes: HashSet::new(),
@@ -67,7 +69,7 @@ fn model(app: &App) -> Model {
 fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event::WindowEvent){
     model.egui.handle_raw_event(event);
 }
-fn render_egui(egui: &mut Egui, murica: &mut f32) {
+fn render_egui(egui: &mut Egui, murica: &mut f32, stop: &mut bool) {
     let egui = egui;
     // egui.set_elapsed_time(update.since_start);
 
@@ -76,13 +78,28 @@ fn render_egui(egui: &mut Egui, murica: &mut f32) {
     egui::Window::new("Rum window").show(&ctx, |ui| {
         ui.label("res"); // template
         ui.add(egui::Slider::new(murica, 1.0..=40.0));
+        // ui.checkbox(stop, "Stop");
+        let stop_clicked = ui.button("stop").clicked();
+        let stop_clone = *stop;
+        if stop_clicked {
+            *stop = !stop_clone;
+        }
     });
 }
 
 
 fn update(app: &App, model: &mut Model, _update: Update) {
-    render_egui(&mut model.egui, &mut model.step_speed);
-    if app.elapsed_frames() as f32 % model.step_speed != 0.0 {
+    render_egui(&mut model.egui, &mut model.step_speed, &mut model.stop);
+    let mouse_pos = app.mouse.position();
+    for row in &model.nodes {
+        for node in row {
+            if (mouse_pos - node.position*Node::DIST).length() <= Node::RAD {
+                println!("pos: {}, connections: {:?}", node.position, node.connected_nodes);
+            }
+        }
+    }
+    if app.elapsed_frames() as f32 % model.step_speed != 0.0 || model.stop {
+        println!("{}", model.stop);
         return;
     }
     let direction_list = [vec2(1.0,0.0), vec2(0.0,1.0), vec2(-1.0,0.0), vec2(0.0,-1.0)];
