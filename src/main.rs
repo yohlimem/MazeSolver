@@ -12,6 +12,9 @@ struct Model {
     _window: window::Id,
     nodes: Vec<Vec<Node>>,
     maze_size: usize,
+    walker: (Vec2, Vec2, usize),
+    explored_nodes: Vec<Vec2>,
+    traced_nodes: HashSet<usize>,
 }
 
 fn main() {
@@ -51,19 +54,69 @@ fn model(app: &App) -> Model {
         _window,
         nodes,
         maze_size,
+        walker: (vec2(0.0, 0.0), vec2(1.0, 0.0), 1),
+        explored_nodes: vec![vec2(0.0, 0.0)],
+        traced_nodes: HashSet::new(),
     }
 }
 
 
 fn update(app: &App, model: &mut Model, _update: Update) {
-    let mouse_pos = app.mouse.position();
-    for row in &model.nodes {
-        for node in row {
-            if (mouse_pos - node.position*Node::DIST).length() <= Node::RAD {
-                println!("pos: {}, connections: {:?}", node.position, node.connected_nodes);
-            }
+    let direction_list = [vec2(1.0,0.0), vec2(0.0,1.0), vec2(-1.0,0.0), vec2(0.0,-1.0)];
+    let random_dir = random_range(0, 4);
+    let random_dir = direction_list[random_dir];
+    
+    if is_outside(model.walker.0 + random_dir, model.maze_size) {
+        return;
+    } 
+    
+    if already_explored(&model.explored_nodes, &(model.walker.0 + random_dir)){
+        // walker.2 += 1;
+        while model.traced_nodes.contains(&(model.explored_nodes.len() - model.walker.2)) && model.walker.2 < model.maze_size * model.maze_size {
+            model.walker.2 += 1;
+            // println!("walker.2: {}", walker.2);
         }
+        let index = model.explored_nodes.len() - model.walker.2;
+        model.walker.1 = model.walker.0;
+        model.walker.0 = model.explored_nodes[index];
+
+        // println!("index: {}", walker.2);
+        let mut try_again = true;
+        for dir in direction_list{
+            if already_explored(&model.explored_nodes, &(model.walker.0 + dir)) {
+                continue;
+            }
+            if is_outside(model.walker.0 + dir, model.maze_size) {
+                continue;
+            }
+            model.walker.1 = model.walker.0;
+            model.walker.0 += dir;
+            // println!("new pos = {}, from_branch = {}, dir = {dir}", walker.0, walker.0 - dir);
+            try_again = false;
+            break;
+            
+        }
+        if try_again {
+
+            // explored_nodes.remove(explored_nodes.len() - walker.2);
+            // println!("try again");
+            model.traced_nodes.insert(model.explored_nodes.len() - model.walker.2);
+            return;
+        }
+    } else {
+
+        // println!("normal");
+        model.walker.1 = model.walker.0; // set last pose to this
+        model.walker.0 += random_dir; // set new pose
     }
+
+    
+    model.walker.2 = 1; // set tracer index to 1
+
+    model.explored_nodes.push(model.walker.0);
+    // println!("{}, {}", walker.0, walker.1);
+    Node::connect((model.walker.0.x as usize, model.walker.0.y as usize), (model.walker.1.x as usize, model.walker.1.y as usize), &mut model.nodes);
+    
 
 }
 
@@ -99,70 +152,7 @@ fn already_explored(explored_nodes_list: &Vec<Vec2>, pos: &Vec2) -> bool{
 
 fn generate_maze(maze_size: usize, nodes: &mut Vec<Vec<Node>>){
         // if model.maze_size * model.maze_size <= model.walker.2 {return} // dont crash
-    let mut walker: (Vec2, Vec2, usize) = (vec2(0.0, 0.0), vec2(1.0, 0.0), 1);
-    let mut explored_nodes = vec![vec2(0.0, 0.0)];
-    let mut traced_nodes = HashSet::new();
-
-    let direction_list = [vec2(1.0,0.0), vec2(0.0,1.0), vec2(-1.0,0.0), vec2(0.0,-1.0)];
-
-
-    while explored_nodes.len() <= maze_size * maze_size && walker.2 < maze_size * maze_size {
-        // println!("explored_nodes.len(): {} , maze_size: {}", explored_nodes.len(), maze_size * maze_size);
-
-        let random_dir = random_range(0, 4);
-        let random_dir = direction_list[random_dir];
-        
-        if is_outside(walker.0 + random_dir, maze_size) {
-            continue
-        } 
-        
-        if already_explored(&explored_nodes, &(walker.0 + random_dir)){
-            // walker.2 += 1;
-            while traced_nodes.contains(&(explored_nodes.len() - walker.2)) && walker.2 < maze_size * maze_size {
-                walker.2 += 1;
-                // println!("walker.2: {}", walker.2);
-            }
-            let index = explored_nodes.len() - walker.2;
-            walker.1 = walker.0;
-            walker.0 = explored_nodes[index];
     
-            // println!("index: {}", walker.2);
-            let mut try_again = true;
-            for dir in direction_list{
-                if already_explored(&explored_nodes, &(walker.0 + dir)) {
-                    continue;
-                }
-                if is_outside(walker.0 + dir, maze_size) {
-                    continue;
-                }
-                walker.1 = walker.0;
-                walker.0 += dir;
-                // println!("new pos = {}, from_branch = {}, dir = {dir}", walker.0, walker.0 - dir);
-                try_again = false;
-                break;
-                
-            }
-            if try_again {
-    
-                // explored_nodes.remove(explored_nodes.len() - walker.2);
-                // println!("try again");
-                traced_nodes.insert(explored_nodes.len() - walker.2);
-                continue;
-            }
-        } else {
-    
-            // println!("normal");
-            walker.1 = walker.0; // set last pose to this
-            walker.0 += random_dir; // set new pose
-        }
-    
-        
-        walker.2 = 1; // set tracer index to 1
-    
-        explored_nodes.push(walker.0);
-        // println!("{}, {}", walker.0, walker.1);
-        Node::connect((walker.0.x as usize, walker.0.y as usize), (walker.1.x as usize, walker.1.y as usize), nodes);
-    }
     
 
 }
