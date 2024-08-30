@@ -1,15 +1,17 @@
+use std::{cell::{Ref, RefCell}, rc::Rc};
+
 use nannou::{draw::{mesh::vertex::Color, properties::spatial::position}, prelude::*};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Connection {
-    In(Vec2),
-    Out(Vec2),
+    In(Rc<Node>),
+    Out(Rc<Node>),
 }
 
 #[derive(PartialEq, Clone)]
 pub struct Node {
     pub position: Vec2,
-    pub connected_nodes: Option<Vec<Connection>>,
+    pub connected_nodes: RefCell<Vec<Connection>>,
 } 
 
 impl Node {
@@ -18,7 +20,7 @@ impl Node {
     pub fn new(position: Vec2) -> Self {
         Node {
             position,
-            connected_nodes: None,
+            connected_nodes: RefCell::new(Vec::new()),
         }
     }
 
@@ -29,7 +31,7 @@ impl Node {
             .color(color);
     }
 
-    pub fn connect(self_index: (usize, usize), other_index: (usize, usize), nodes: &mut Vec<Vec<Node>>) {
+    pub fn connect(self_index: (usize, usize), other_index: (usize, usize), nodes: &mut Vec<Vec<Rc<Node>>>) {
 
         assert!(nodes[self_index.0][self_index.1].position != nodes[other_index.0][other_index.1].position, "Can't connect a node to itself");
 
@@ -38,59 +40,50 @@ impl Node {
         
         // we connect a node
         // out going for us, in going for them
-        if nodes[self_index.0][self_index.1].connected_nodes.is_none() {
-            nodes[self_index.0][self_index.1].connected_nodes = Some(vec![Connection::In(nodes[other_index.0][other_index.1].position)]);
-        } else {
-            let position = (nodes[other_index.0][other_index.1].position).clone();
-            if let Some(last_nodes) = &mut nodes[self_index.0][self_index.1].connected_nodes {
-                last_nodes.push(Connection::In(position));
-            }
-        }
+        let node = Rc::clone(&nodes[other_index.0][other_index.1]);
+        // let last_nodes = &mut nodes[self_index.0][self_index.1].connected_nodes;
+        nodes[self_index.0][self_index.1].connected_nodes.borrow_mut().push(Connection::In(Rc::clone(&node)));
+            
         
-        if nodes[other_index.0][other_index.1].connected_nodes.is_none() {
-            nodes[other_index.0][other_index.1].connected_nodes = Some(vec![Connection::Out(nodes[self_index.0][self_index.1].position)]);
-        } else {
-            let position = (nodes[self_index.0][self_index.1].position).clone();
-            if let Some(last_nodes) = &mut nodes[other_index.0][other_index.1].connected_nodes {
-                last_nodes.push(Connection::Out(position));
-            }
-        }
+        
+
+        nodes[other_index.0][other_index.1].connected_nodes.borrow_mut().push(Connection::Out(Rc::clone(&nodes[other_index.0][other_index.1])));
+
     }
 
     pub fn draw_connection(&self, draw: &Draw) {
-        if let Some(last_node) = &self.connected_nodes {
-            last_node.iter().for_each(|node| {
-                match node {
-                    Connection::In(vec) => draw.arrow()
-                        .start(*vec * Self::DIST)
-                        .end(self.position * Self::DIST)
+        &self.connected_nodes.borrow().iter().for_each(|node| {
+            match node {
+                Connection::In(vec) => draw.arrow()
+                    .start(vec.position * Self::DIST)
+                    .end(self.position * Self::DIST)
+                    .color(BLACK),
+                Connection::Out(vec) => draw.arrow()
+                        .start(self.position * Self::DIST)
+                        .end(vec.position * Self::DIST)
                         .color(BLACK),
-                    Connection::Out(vec) => draw.arrow()
-                            .start(self.position * Self::DIST)
-                            .end(*vec * Self::DIST)
-                            .color(BLACK),
-                };
-            });
-        }
+            };
+        });
+        
     }
 
     pub fn print_nodes(&self) {
         let position = self.position;
 
-        let connected_nodes = self.connected_nodes.clone().unwrap();
+        let connected_nodes = self.connected_nodes.clone();
         println!("position: {}, connected nodes: {:?}", position, connected_nodes);
     }
 
     pub fn is_connected(&self) -> bool{
-        self.connected_nodes.is_some()
+        self.connected_nodes.borrow().len() > 0
     }
 }
 
 impl Node {
     pub fn able_to_move_to(&self, to: &Node) -> bool {
-        self.connected_nodes.clone().unwrap().iter().any(|node| {
+        self.connected_nodes.borrow().iter().any(|node| {
             match node {
-                Connection::Out(vec) => vec == &to.position,
+                Connection::Out(vec) => vec.position == to.position,
                 _ => false,
             }
         })

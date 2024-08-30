@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::{time::Duration, vec};
 
 use nannou::prelude::*;
@@ -10,7 +11,7 @@ use std::collections::HashSet;
 // TODO: Make it so it doesnt trace over the same node twice.
 struct Model {
     _window: window::Id,
-    nodes: Vec<Vec<Node>>,
+    nodes: Vec<Vec<Rc<Node>>>,
     maze_size: usize,
 }
 
@@ -29,7 +30,7 @@ fn model(app: &App) -> Model {
     for i in 0..maze_size {
         let mut row = Vec::new();
         for j in 0..maze_size {
-            row.push(Node::new(vec2((i as f32 - maze_size as f32 / 2.0) as f32, (j as f32 - maze_size as f32/2.0) as f32)));
+            row.push(Rc::new(Node::new(vec2((i as f32 - maze_size as f32 / 2.0) as f32, (j as f32 - maze_size as f32/2.0) as f32))));
         }
         nodes.push(row);
     }
@@ -97,7 +98,7 @@ fn already_explored(explored_nodes_list: &Vec<Vec2>, pos: &Vec2) -> bool{
     explored_nodes_list.contains(pos)
 }
 
-fn generate_maze(maze_size: usize, nodes: &mut Vec<Vec<Node>>){
+fn generate_maze(maze_size: usize, nodes: &mut Vec<Vec<Rc<Node>>>){
         // if model.maze_size * model.maze_size <= model.walker.2 {return} // dont crash
     let mut walker: (Vec2, Vec2, usize) = (vec2(0.0, 0.0), vec2(1.0, 0.0), 1);
     let mut explored_nodes = vec![vec2(0.0, 0.0)];
