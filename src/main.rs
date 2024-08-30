@@ -5,6 +5,8 @@ use nannou::prelude::*;
 mod Nodes;
 mod Astar;
 use crate::Astar::AStar;
+use crate::Astar::RandomStar;
+use Astar::{Done, MazeSolver};
 use crate::Nodes::Node;
 use std::collections::HashSet;
 
@@ -13,6 +15,7 @@ struct Model {
     _window: window::Id,
     nodes: Vec<Vec<Rc<Node>>>,
     maze_size: usize,
+    random_star: RandomStar,
 }
 
 fn main() {
@@ -25,7 +28,7 @@ fn model(app: &App) -> Model {
     let mut nodes = Vec::new();
 
 
-    let maze_size = 20;
+    let maze_size = 10;
 
     for i in 0..maze_size {
         let mut row = Vec::new();
@@ -36,35 +39,42 @@ fn model(app: &App) -> Model {
     }
 
     
-    let time = std::time::Instant::now();
+    // let time = std::time::Instant::now();
     
     generate_maze(maze_size, &mut nodes);
-    let time2 = std::time::Instant::now();
+    // let time2 = std::time::Instant::now();
     
-    println!("Time to generate maze of size {maze_size} is {:?} ", time2 - time);
-    println!("{:?}", nodes[0][0].connected_nodes);
+    // println!("Time to generate maze of size {maze_size} is {:?} ", time2 - time);
     
-    // println!("{:?}", );
+    println!("{:?}, {:?}", nodes[0][0], nodes[0][0].connected_nodes);
     // nodes[1][0].8 {}",nodes[1][0].able_to_move_to(&nodes[9][0]));
+
+    // println!("first node: {:?}", nodes[0][1].connected_nodes);
+
+    let a_random = RandomStar::new(Rc::clone(&nodes[0][0]), Rc::clone(&nodes[maze_size - 1][maze_size - 1]));
     
 
     Model {
         _window,
         nodes,
         maze_size,
+        random_star: a_random,
     }
 }
 
 
 fn update(app: &App, model: &mut Model, _update: Update) {
-    let mouse_pos = app.mouse.position();
-    for row in &model.nodes {
-        for node in row {
-            if (mouse_pos - node.position*Node::DIST).length() <= Node::RAD {
-                println!("pos: {}, connections: {:?}", node.position, node.connected_nodes);
-            }
-        }
-    }
+    // let mouse_pos = app.mouse.position();
+    // for row in &model.nodes {
+    //     for node in row {
+    //         if (mouse_pos - node.position*Node::DIST).length() <= Node::RAD {
+    //             println!("pos: {}, connections: {:?}", node.position, node.connected_nodes);
+    //         }
+    //     }
+    // }
+    model.random_star.step();
+
+    
 
 }
 
@@ -82,6 +92,29 @@ fn view(app: &App, model: &Model, frame: Frame) {
         }
     }
     model.nodes[0][0].draw(&draw, RED);
+
+    for walker in model.random_star.walkers.iter() {
+        match walker.is_done {
+            Done::Found => {
+                walker.current_node.borrow().draw(&draw, GREEN);
+                break;
+            },
+            Done::NotFound(x) => {
+                if x {
+                    walker.current_node.borrow().draw(&draw, BLUE);
+                } else {
+                    walker.current_node.borrow().draw(&draw, RED);
+
+                }
+                continue;
+            },
+        }
+    }
+
+    // draw.ellipse()
+    //     .x_y()
+    //     .radius(Node::RAD)
+    //     .color(RED);
 
     // model.walker
 

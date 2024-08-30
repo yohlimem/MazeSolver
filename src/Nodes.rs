@@ -8,6 +8,33 @@ pub enum Connection {
     Out(Rc<Node>),
 }
 
+impl Connection {
+    pub fn get_position(&self) -> Vec2 {
+        match self {
+            Connection::In(node) => node.position,
+            Connection::Out(node) => node.position,
+        }
+    }
+
+    pub fn is_out (&self) -> bool {
+        match self {
+            Connection::Out(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn all_out(connections: Ref<Vec<Connection>>) -> Vec<Connection> {
+        connections.clone().into_iter().filter(|node| node.is_out()).collect()
+    }
+
+    pub fn get_out(&self) -> Rc<Node> {
+        match self {
+            Connection::Out(node) => Rc::clone(node),
+            _ => panic!("Can't get out of in connection"),
+        }
+    }
+}
+
 #[derive(PartialEq, Clone)]
 pub struct Node {
     pub position: Vec2,
@@ -32,27 +59,31 @@ impl Node {
     }
 
     pub fn connect(self_index: (usize, usize), other_index: (usize, usize), nodes: &mut Vec<Vec<Rc<Node>>>) {
-
         assert!(nodes[self_index.0][self_index.1].position != nodes[other_index.0][other_index.1].position, "Can't connect a node to itself");
-
-
-
+        
+        
+        
         
         // we connect a node
         // out going for us, in going for them
         let node = Rc::clone(&nodes[other_index.0][other_index.1]);
         // let last_nodes = &mut nodes[self_index.0][self_index.1].connected_nodes;
         nodes[self_index.0][self_index.1].connected_nodes.borrow_mut().push(Connection::In(Rc::clone(&node)));
-            
+        
+        // println!("connecting: {:?} to {:?}", self_index, other_index);
         
         
 
-        nodes[other_index.0][other_index.1].connected_nodes.borrow_mut().push(Connection::Out(Rc::clone(&nodes[other_index.0][other_index.1])));
+        nodes[other_index.0][other_index.1].connected_nodes.borrow_mut().push(Connection::Out(Rc::clone(&nodes[self_index.0][self_index.1])));
+        // println!("node: {:?} out is {}", nodes[other_index.0][other_index.1])
 
     }
 
     pub fn draw_connection(&self, draw: &Draw) {
-        &self.connected_nodes.borrow().iter().for_each(|node| {
+        // if self.position == vec2(-5.0, -5.0) {
+        //     println!("drawing connection for {:?}", self.connected_nodes);
+        // }
+        self.connected_nodes.borrow().iter().for_each(|node| {
             match node {
                 Connection::In(vec) => draw.arrow()
                     .start(vec.position * Self::DIST)
@@ -88,6 +119,13 @@ impl Node {
             }
         })
 
+    }
+    pub fn get_random_neighbour(&self) -> Rc<Node> {
+        let index = random_range(0, self.connected_nodes.borrow().len());
+        match &self.connected_nodes.borrow()[index] {
+            Connection::Out(node) => Rc::clone(node),
+            _ => panic!("Can't get random neighbour"),
+        }
     }
 }
 
