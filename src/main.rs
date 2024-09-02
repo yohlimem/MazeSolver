@@ -1,7 +1,10 @@
+use std::borrow::Borrow;
 use std::rc::Rc;
 use std::{time::Duration, vec};
 
 use nannou::prelude::*;
+use nannou_egui::{self, egui, Egui};
+
 mod Nodes;
 mod Astar;
 use crate::Astar::AStar;
@@ -12,10 +15,13 @@ use std::collections::HashSet;
 
 // TODO: Make it so it doesnt trace over the same node twice.
 struct Model {
-    _window: window::Id,
     nodes: Vec<Vec<Rc<Node>>>,
     maze_size: usize,
+    stop: bool,
+    step_button: bool,
     random_star: RandomStar,
+    egui: Egui,
+
 }
 
 fn main() {
@@ -23,12 +29,14 @@ fn main() {
 }
 
 fn model(app: &App) -> Model {
-    let _window = app.new_window().view(view).build().unwrap();
+    let window_id = app.new_window().view(view).raw_event(raw_window_event).build().unwrap();
+    let window = app.window(window_id).unwrap();
+    let egui = Egui::from_window(&window);
 
     let mut nodes = Vec::new();
 
 
-    let maze_size = 10;
+    let maze_size = 30;
 
     for i in 0..maze_size {
         let mut row = Vec::new();
@@ -46,24 +54,59 @@ fn model(app: &App) -> Model {
     
     // println!("Time to generate maze of size {maze_size} is {:?} ", time2 - time);
     
-    println!("{:?}, {:?}", nodes[0][0], nodes[0][0].connected_nodes);
+    // println!("{:?}, {:?}", nodes[0][0], nodes[0][0].connected_nodes);
     // nodes[1][0].8 {}",nodes[1][0].able_to_move_to(&nodes[9][0]));
 
     // println!("first node: {:?}", nodes[0][1].connected_nodes);
 
-    let a_random = RandomStar::new(Rc::clone(&nodes[0][0]), Rc::clone(&nodes[maze_size - 1][maze_size - 1]));
+    // connect random nodes that are beside each other
+    // for i in 0..50 {
+
+    //     let direction_list = [vec2(1.0,0.0), vec2(0.0,1.0), vec2(-1.0,0.0), vec2(0.0,-1.0)];
+    //     let dir = direction_list[random_range(0, 4)];
+    
+    //     // choose random node to connect
+    //     let random_node = vec2(random_range(0, maze_size) as  f32, random_range(0, maze_size) as f32);
+    //     let next_node = vec2(random_node.x + dir.x, random_node.y + dir.y);
+
+    //     if is_outside(random_node, maze_size) || is_outside(next_node, maze_size) {
+    //         continue;
+    //     }
+
+
+    //     if nodes[random_node.x as usize][random_node.y as usize].contains(nodes[next_node.x as usize][next_node.y as usize].borrow()) {
+    //         continue;       
+    //     }
+    //     if nodes[next_node.x as usize][next_node.y as usize].contains(nodes[random_node.x as usize][random_node.y as usize].borrow()) {
+    //         continue;
+    //     }
+
+    //     let random_node = (random_node.x as usize, random_node.y as usize);
+    //     let next_node = (next_node.x as usize, next_node.y as usize);
+
+    //     // convert to tuple of usize
+    
+    //     Node::connect(random_node, next_node, &mut nodes);
+    // }
+
+
+    let a_random = RandomStar::new(Rc::clone(&nodes[0][0]), Rc::clone(&nodes[0][maze_size - 1]));
     
 
     Model {
-        _window,
         nodes,
         maze_size,
         random_star: a_random,
+        egui,
+        stop: false,
+        step_button: false,
     }
 }
 
 
 fn update(app: &App, model: &mut Model, _update: Update) {
+    render_egui(&mut model.egui, &mut model.nodes, &mut model.random_star, model.maze_size, &mut model.stop, &mut model.step_button);
+
     // let mouse_pos = app.mouse.position();
     // for row in &model.nodes {
     //     for node in row {
@@ -72,6 +115,16 @@ fn update(app: &App, model: &mut Model, _update: Update) {
     //         }
     //     }
     // }
+    // if app.elapsed_frames() % 10 == 0 {
+    //     model.random_star.step();
+    // }
+    if model.step_button {
+        model.random_star.step();
+        
+    }
+    if model.stop {
+        return;
+    }
     model.random_star.step();
 
     
@@ -84,26 +137,38 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     for row in &model.nodes {
         for node in row {
-            node.draw(&draw, GREY);
-            if node.is_connected() {
-                node.draw_connection(&draw)
+            node.draw(&draw, srgba8(0,0,0,0));
+            // if node.is_connected() {
+            //     node.draw_connection(&draw)
 
-            }
+            // }
         }
     }
-    model.nodes[0][0].draw(&draw, RED);
+    model.nodes[0][0].draw(&draw, RED.into());
 
+    for node in 1..model.random_star.path.len() {
+        model.random_star.path[node-1].draw(&draw, GREEN.into());
+    }
     for walker in model.random_star.walkers.iter() {
         match walker.is_done {
             Done::Found => {
-                walker.current_node.borrow().draw(&draw, GREEN);
-                break;
+            for node in 1..walker.path.len() {
+
+                walker.current_node.borrow().draw(&draw, GREEN.into());
+                // draw arrows for connections
+                draw.arrow()
+                    .start(walker.path[node-1].position*Node::DIST)
+                    .end(walker.path[node].position*Node::DIST)
+                    .weight(2.0)
+                    .color(BLUE);
+                }
+                    
             },
             Done::NotFound(x) => {
                 if x {
-                    walker.current_node.borrow().draw(&draw, BLUE);
+                    walker.current_node.borrow().draw(&draw, BLUE.into());
                 } else {
-                    walker.current_node.borrow().draw(&draw, RED);
+                    walker.current_node.borrow().draw(&draw, RED.into());
 
                 }
                 continue;
@@ -111,18 +176,36 @@ fn view(app: &App, model: &Model, frame: Frame) {
         }
     }
 
-    // draw.ellipse()
-    //     .x_y()
-    //     .radius(Node::RAD)
-    //     .color(RED);
-
-    // model.walker
-
-    
 
     draw.to_frame(app, &frame).unwrap();
+    model.egui.draw_to_frame(&frame).unwrap();
+
 }
 
+fn raw_window_event(_app: &App, model: &mut Model, event: &nannou::winit::event::WindowEvent){
+    model.egui.handle_raw_event(event);
+}
+fn render_egui(egui: &mut Egui, nodes: &mut Vec<Vec<Rc<Node>>>, random_star: &mut RandomStar, maze_size: usize, stop: &mut bool, step: &mut bool){
+    let egui = egui;
+    // egui.set_elapsed_time(update.since_start);
+
+    let ctx = egui.begin_frame();
+
+    egui::Window::new("Rum window").show(&ctx, |ui| {
+        // ui.label("res"); // template
+        // ui.add(egui::Slider::new(&mut model.num, 1.0..=40.0));
+        ui.label("reset");
+        let reset_button = ui.button("reset!").clicked();
+        if reset_button {
+            reset(nodes, random_star, maze_size);
+        }
+        let stop_button = ui.button("stop").clicked();
+        if stop_button {
+            *stop = !*stop;
+        }
+        *step = ui.button("step").clicked();
+    });
+}
 fn is_outside(next_pos: Vec2, maze_size: usize) -> bool{
     next_pos.x > maze_size as f32 - 1.0 || next_pos.y > maze_size as f32 - 1.0 || next_pos.y < 0.0 || next_pos.x < 0.0
 }
@@ -198,5 +281,16 @@ fn generate_maze(maze_size: usize, nodes: &mut Vec<Vec<Rc<Node>>>){
         Node::connect((walker.0.x as usize, walker.0.y as usize), (walker.1.x as usize, walker.1.y as usize), nodes);
     }
     
+
+}
+
+fn reset(nodes: &mut Vec<Vec<Rc<Node>>>, random_star: &mut RandomStar, maze_size: usize){
+    nodes.iter().for_each(|row| {
+        row.iter().for_each(|node| {
+            node.connected_nodes.borrow_mut().clear();
+        })
+    });
+    *random_star = RandomStar::new(Rc::clone(&nodes[0][0]), Rc::clone(&nodes[maze_size - 1][maze_size - 1]));
+    generate_maze(maze_size, nodes);
 
 }
